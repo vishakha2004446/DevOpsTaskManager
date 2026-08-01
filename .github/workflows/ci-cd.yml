@@ -3,16 +3,23 @@ name: Task Manager CI/CD
 on:
   push:
     branches:
-      - master
+      - main
 
   pull_request:
     branches:
-      - master
+      - main
 
   workflow_dispatch:
 
+
 jobs:
+
+  # ==========================================
+  # JOB 1: BUILD AND TEST
+  # ==========================================
+
   build-and-test:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -21,49 +28,174 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js
+
+      # Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 3. Install Backend Dependencies
+
+      # 2. Install Backend Dependencies
       - name: Install Backend Dependencies
         working-directory: ./backend
         run: npm ci
 
-      # 4. Install Frontend Dependencies
+
+      # 3. Install Frontend Dependencies
       - name: Install Frontend Dependencies
         working-directory: ./frontend
         run: npm ci
 
-      # 5. Lint Backend
+
+      # 4. Lint Backend
       - name: Lint Backend
         working-directory: ./backend
         run: npm run lint
 
-      # 6. Lint Frontend
+
+      # 5. Lint Frontend
       - name: Lint Frontend
         working-directory: ./frontend
         run: npm run lint
 
-      # 7. Build Frontend
+
+      # 6. Build Frontend
       - name: Build Frontend
         working-directory: ./frontend
         run: npm run build
 
-      # 8. Run Backend Tests
+
+      # 7. Run Backend Tests
       - name: Run Backend Tests
         working-directory: ./backend
         run: npm test
 
-      # 9. Package Frontend Artifact
+
+      # 8. Package Frontend Artifact
       - name: Package Frontend
         run: tar -czf frontend-build.tar.gz -C frontend dist
 
-      # 10. Upload Frontend Artifact
+
+      # 9. Upload Artifact
       - name: Upload Frontend Artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend-build.tar.gz
+
+
+  # ==========================================
+  # JOB 2: DOCKER BUILD
+  # ==========================================
+
+  docker-build:
+
+    needs: build-and-test
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+
+      # 10. Build Backend Docker Image
+      - name: Build Backend Docker Image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/task-manager-backend:latest \
+            ./backend
+
+
+      # 11. Build Frontend Docker Image
+      - name: Build Frontend Docker Image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/task-manager-frontend:latest \
+            ./frontend
+
+
+  # ==========================================
+  # JOB 3: DOCKER PUSH
+  # ==========================================
+
+  docker-push:
+
+    needs: docker-build
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+
+      # Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+
+      # Build Backend Image
+      - name: Build Backend Image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/task-manager-backend:latest \
+            ./backend
+
+
+      # Push Backend Image
+      - name: Push Backend Image
+        run: |
+          docker push \
+            ${{ secrets.DOCKER_USERNAME }}/task-manager-backend:latest
+
+
+      # Build Frontend Image
+      - name: Build Frontend Image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/task-manager-frontend:latest \
+            ./frontend
+
+
+      # Push Frontend Image
+      - name: Push Frontend Image
+        run: |
+          docker push \
+            ${{ secrets.DOCKER_USERNAME }}/task-manager-frontend:latest
+
+
+  # ==========================================
+  # JOB 4: NOTIFICATION
+  # ==========================================
+
+  notification:
+
+    needs: docker-push
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Deployment Notification
+        run: |
+          echo "================================="
+          echo "CI/CD PIPELINE COMPLETED"
+          echo "================================="
+          echo "Code Checkout: SUCCESS"
+          echo "Dependencies: SUCCESS"
+          echo "Lint: SUCCESS"
+          echo "Build: SUCCESS"
+          echo "Tests: SUCCESS"
+          echo "Artifacts: SUCCESS"
+          echo "Docker Build: SUCCESS"
+          echo "Docker Push: SUCCESS"
+          echo "================================="

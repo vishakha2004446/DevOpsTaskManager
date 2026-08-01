@@ -17,18 +17,31 @@ function App() {
   };
 
   useEffect(() => {
-    fetchTasks();
+    const loadTasks = async () => {
+      try {
+        const response = await API.get("/tasks");
+        setTasks(response.data);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+      }
+    };
+
+    loadTasks();
   }, []);
 
   return (
     <div className="app-container">
       <div className="app-content">
         <h1 className="app-title">TODO LIST</h1>
+
         <div className="divider"></div>
-        
+
         <TaskForm fetchTasks={fetchTasks} />
 
-        <TaskList tasks={tasks} fetchTasks={fetchTasks} />
+        <TaskList
+          tasks={tasks}
+          fetchTasks={fetchTasks}
+        />
       </div>
     </div>
   );

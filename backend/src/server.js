@@ -26,7 +26,7 @@ app.get("/", (req, res) => {
 app.use("/api/tasks", taskRoutes);
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   console.error("Unhandled error:", err);
   res.status(500).json({
     message: "Internal server error",
